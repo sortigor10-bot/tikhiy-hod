@@ -9,8 +9,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=stockfish-1" />
-    <script src="game.js?v=stockfish-1" defer></script>
+    <link rel="stylesheet" href="style.css?v=setup-editor-1" />
+    <script src="game.js?v=setup-editor-1" defer></script>
   </head>
   <body>
     <main class="page-shell">
@@ -59,6 +59,33 @@
             <option value="3">Серьёзный соперник</option>
           </select>
 
+          <section class="setup-panel" id="setupPanel" aria-label="Расстановка фигур">
+            <div class="setup-heading">
+              <span>РАССТАНОВКА ФИГУР</span>
+              <span class="setup-badge" id="setupBadge">ДО СТАРТА</span>
+            </div>
+            <p class="setup-instruction" id="setupInstruction">Перетащи фигуру или выбери её, затем клетку. Палитра добавляет фигуры.</p>
+            <div class="piece-palette" id="piecePalette" aria-label="Добавить фигуру">
+              <button class="palette-choice white-piece" type="button" data-piece="K" aria-label="Добавить белого короля" aria-pressed="false">♔</button>
+              <button class="palette-choice white-piece" type="button" data-piece="Q" aria-label="Добавить белого ферзя" aria-pressed="false">♕</button>
+              <button class="palette-choice white-piece" type="button" data-piece="R" aria-label="Добавить белую ладью" aria-pressed="false">♖</button>
+              <button class="palette-choice white-piece" type="button" data-piece="B" aria-label="Добавить белого слона" aria-pressed="false">♗</button>
+              <button class="palette-choice white-piece" type="button" data-piece="N" aria-label="Добавить белого коня" aria-pressed="false">♘</button>
+              <button class="palette-choice white-piece" type="button" data-piece="P" aria-label="Добавить белую пешку" aria-pressed="false">♙</button>
+              <button class="palette-choice black-piece" type="button" data-piece="k" aria-label="Добавить чёрного короля" aria-pressed="false">♚</button>
+              <button class="palette-choice black-piece" type="button" data-piece="q" aria-label="Добавить чёрного ферзя" aria-pressed="false">♛</button>
+              <button class="palette-choice black-piece" type="button" data-piece="r" aria-label="Добавить чёрную ладью" aria-pressed="false">♜</button>
+              <button class="palette-choice black-piece" type="button" data-piece="b" aria-label="Добавить чёрного слона" aria-pressed="false">♝</button>
+              <button class="palette-choice black-piece" type="button" data-piece="n" aria-label="Добавить чёрного коня" aria-pressed="false">♞</button>
+              <button class="palette-choice black-piece" type="button" data-piece="p" aria-label="Добавить чёрную пешку" aria-pressed="false">♟</button>
+            </div>
+            <div class="setup-tools">
+              <button class="setup-tool-button" id="erasePieceButton" type="button" aria-pressed="false">⌫ УБРАТЬ ФИГУРУ</button>
+              <button class="setup-tool-button" id="resetPiecesButton" type="button">↻ СБРОСИТЬ ФИГУРЫ</button>
+            </div>
+            <p class="setup-error" id="setupError" role="alert" tabindex="-1" hidden></p>
+          </section>
+
           <button class="new-game-button" id="newGameButton" type="button">
             <span aria-hidden="true">▶</span><span id="newGameButtonLabel">Начать игру</span>
           </button>
@@ -87,7 +114,7 @@
             <div class="board-coordinates board-ranks" id="boardRanks" aria-hidden="true">
               <span>8</span><span>7</span><span>6</span><span>5</span><span>4</span><span>3</span><span>2</span><span>1</span>
             </div>
-            <div class="chess-board" id="chessBoard" role="grid" aria-label="Шахматная доска"></div>
+            <div class="chess-board is-editing" id="chessBoard" role="grid" aria-label="Шахматная доска"></div>
           </div>
 
           <div class="board-footer">

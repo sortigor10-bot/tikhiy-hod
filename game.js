@@ -19,6 +19,12 @@ const resultTitle = document.getElementById('resultTitle');
 const resultMessage = document.getElementById('resultMessage');
 const resultIcon = document.getElementById('resultIcon');
 const resultViewBoardButton = document.getElementById('resultViewBoardButton');
+const setupPanel = document.getElementById('setupPanel');
+const setupInstruction = document.getElementById('setupInstruction');
+const setupErrorElement = document.getElementById('setupError');
+const piecePalette = document.getElementById('piecePalette');
+const erasePieceButton = document.getElementById('erasePieceButton');
+const resetPiecesButton = document.getElementById('resetPiecesButton');
 
 const files = 'abcdefgh';
 const symbols = {
@@ -55,6 +61,9 @@ let resultTimeout = null;
 let playerColor = 'w';
 let boardFlipped = false;
 let gameStarted = false;
+let setupTool = null;
+let draggedSetupSquare = null;
+let suppressSetupClick = false;
 let playedMoves = [];
 let positionHistory = [positionKey(position)];
 let undoStack = [];
@@ -769,6 +778,7 @@ function renderBoard() {
     return coordinate;
   }));
   boardElement.innerHTML = '';
+  boardElement.classList.toggle('is-editing', !gameStarted);
   boardElement.setAttribute('aria-label', `Шахматная доска, снизу ${boardFlipped ? 'чёрные' : 'белые'}`);
   for (const rank of displayRanks) {
     for (const file of displayFiles) {
@@ -781,6 +791,7 @@ function renderBoard() {
       button.setAttribute('role', 'gridcell');
       button.setAttribute('aria-label', `${squareName(square)}${piece ? `, ${pieceName(piece)}` : ''}`);
       button.setAttribute('aria-selected', String(selectedSquare === square));
+      button.draggable = !gameStarted && Boolean(piece);
       if (selectedSquare === square) button.classList.add('selected');
       if (checkedKing === square) button.classList.add('in-check');
       if (lastMove && (lastMove.from === square || lastMove.to === square)) button.classList.add('last-move');
@@ -828,6 +839,21 @@ function render() {
   renderBoard();
   renderMoves();
   updateUndoButton();
+  setupPanel.hidden = gameStarted;
+  for (const button of piecePalette.querySelectorAll('[data-piece]')) {
+    const isSelected = setupTool === button.dataset.piece;
+    button.classList.toggle('is-selected', isSelected);
+    button.setAttribute('aria-pressed', String(isSelected));
+    button.disabled = gameStarted;
+  }
+  erasePieceButton.setAttribute('aria-pressed', String(setupTool === 'erase'));
+  erasePieceButton.disabled = gameStarted;
+  resetPiecesButton.disabled = gameStarted;
+  setupInstruction.textContent = setupTool === 'erase'
+    ? 'Выбери фигуру на доске, чтобы убрать её.'
+    : setupTool
+      ? 'Выбери клетки на доске, чтобы расставить выбранную фигуру.'
+      : 'Перетащи фигуру или выбери её, затем клетку. Палитра добавляет фигуры.';
   positionLabel.textContent = gameOver ? 'Партия завершена' : position.fullmove === 1 && position.turn === 'w' ? 'Начальная позиция' : `Ход ${position.fullmove}`;
   document.getElementById('playerTurnIndicator').style.visibility = gameStarted && position.turn === playerColor && !gameOver ? 'visible' : 'hidden';
   const botName = botEngineSelect.value === 'stockfish' ? 'Stockfish' : 'Котик';
@@ -844,6 +870,8 @@ function render() {
   const rotateButton = document.getElementById('rotateBoardButton');
   rotateButton.setAttribute('aria-pressed', String(boardFlipped));
   rotateButton.disabled = activeMoveAnimation !== null;
+  playerColorSelect.disabled = gameStarted;
+  botEngineSelect.disabled = gameStarted;
 }
 
 function updateUndoButton() {
@@ -851,8 +879,140 @@ function updateUndoButton() {
   undoButton.disabled = !gameStarted || gameOver || undoStack.length === 0 || botThinking || activeMoveAnimation !== null || botOpeningNotPlayed;
 }
 
+function updateEditedPosition() {
+  position.castling = { K: false, Q: false, k: false, q: false };
+  position.enPassant = null;
+  position.halfmove = 0;
+  position.fullmove = 1;
+  position.turn = 'w';
+  lastMove = null;
+  positionHistory = [positionKey(position)];
+  undoStack = [];
+  gameOver = false;
+  setupErrorElement.hidden = true;
+  setupErrorElement.textContent = '';
+}
+
+function editSetupSquare(square) {
+  if (gameStarted) return;
+
+  if (setupTool === 'erase') {
+    if (position.board[square]) {
+      position.board[square] = null;
+      updateEditedPosition();
+    }
+    selectedSquare = null;
+    render();
+    return;
+  }
+
+  if (setupTool) {
+    position.board[square] = setupTool;
+    selectedSquare = null;
+    updateEditedPosition();
+    render();
+    return;
+  }
+
+  if (selectedSquare === square) {
+    selectedSquare = null;
+  } else if (selectedSquare !== null) {
+    position.board[square] = position.board[selectedSquare];
+    position.board[selectedSquare] = null;
+    selectedSquare = null;
+    updateEditedPosition();
+  } else if (position.board[square]) {
+    selectedSquare = square;
+  }
+  render();
+}
+
+function updateSetupToolSelection() {
+  for (const button of piecePalette.querySelectorAll('[data-piece]')) {
+    const isSelected = setupTool === button.dataset.piece;
+    button.classList.toggle('is-selected', isSelected);
+    button.setAttribute('aria-pressed', String(isSelected));
+  }
+  erasePieceButton.setAttribute('aria-pressed', String(setupTool === 'erase'));
+}
+
+function validateSetupPosition() {
+  const whiteKings = position.board.filter((piece) => piece === 'K').length;
+  const blackKings = position.board.filter((piece) => piece === 'k').length;
+  if (whiteKings !== 1 || blackKings !== 1) {
+    return 'Для начала партии на доске должен быть ровно один белый и один чёрный король.';
+  }
+
+  for (const color of ['w', 'b']) {
+    const pieces = position.board.filter((piece) => piece && colorOf(piece) === color);
+    if (pieces.length > 16) {
+      return `На доске может быть не больше 16 фигур ${color === 'w' ? 'у белых' : 'у чёрных'}.`;
+    }
+    const pawns = pieces.filter((piece) => piece.toLowerCase() === 'p').length;
+    if (pawns > 8) {
+      return `На доске может быть не больше 8 пешек ${color === 'w' ? 'у белых' : 'у чёрных'}.`;
+    }
+  }
+
+  const pawnsOnLastRank = position.board.some((piece, square) => (
+    piece && piece.toLowerCase() === 'p' && (Math.floor(square / 8) === 0 || Math.floor(square / 8) === 7)
+  ));
+  if (pawnsOnLastRank) {
+    return 'Пешку нельзя поставить на первую или восьмую горизонталь.';
+  }
+  if (isInCheck(position, 'b')) {
+    return 'Белые не могут начинать ход, оставив своего соперника под шахом.';
+  }
+  return null;
+}
+
+function startPreparedGame() {
+  const validationMessage = validateSetupPosition();
+  if (validationMessage) {
+    setupErrorElement.textContent = validationMessage;
+    setupErrorElement.hidden = false;
+    setupErrorElement.focus();
+    return;
+  }
+
+  gameStarted = true;
+  gameOver = false;
+  botThinking = false;
+  selectedSquare = null;
+  selectedMoves = [];
+  setupTool = null;
+  updateSetupToolSelection();
+  playedMoves = [];
+  positionHistory = [positionKey(position)];
+  undoStack = [];
+  lastMove = null;
+  position.turn = 'w';
+  position.fullmove = 1;
+  position.halfmove = 0;
+  resultDialog.hidden = true;
+  botErrorElement.hidden = true;
+  botErrorElement.textContent = '';
+  setupErrorElement.hidden = true;
+  thinkingLabel.textContent = '';
+
+  const result = terminalResult(position, positionHistory);
+  if (result) {
+    gameOver = true;
+    setStatus(result.title.toLocaleUpperCase('ru'), true);
+    showResult(result);
+  } else {
+    setStatus(position.turn === playerColor ? 'ТВОЙ ХОД' : 'ХОД БОТА');
+  }
+  render();
+  if (!gameOver && position.turn !== playerColor) requestBotMove();
+}
+
 function selectSquare(square) {
-  if (!gameStarted || gameOver || botThinking || activeMoveAnimation || position.turn !== playerColor) return;
+  if (!gameStarted) {
+    editSetupSquare(square);
+    return;
+  }
+  if (gameOver || botThinking || activeMoveAnimation || position.turn !== playerColor) return;
   const piece = position.board[square];
   if (selectedSquare !== null && selectedSquare === square) {
     selectedSquare = null;
@@ -921,7 +1081,7 @@ function undoTurn() {
   render();
 }
 
-function prepareGame(startImmediately) {
+function prepareGame() {
   botRequestId += 1;
   terminateStockfish();
   cancelMoveAnimation();
@@ -936,7 +1096,8 @@ function prepareGame(startImmediately) {
   lastMove = null;
   gameOver = false;
   botThinking = false;
-  gameStarted = startImmediately;
+  gameStarted = false;
+  setupTool = null;
   playedMoves = [];
   positionHistory = [positionKey(position)];
   undoStack = [];
@@ -945,27 +1106,69 @@ function prepareGame(startImmediately) {
   thinkingLabel.textContent = '';
   botErrorElement.hidden = true;
   botErrorElement.textContent = '';
-  setStatus(!gameStarted ? 'ГОТОВ К ИГРЕ' : playerColor === 'w' ? 'ТВОЙ ХОД' : 'ХОД БОТА');
+  setupErrorElement.hidden = true;
+  setupErrorElement.textContent = '';
+  setStatus('ГОТОВ К ИГРЕ');
   render();
-  if (gameStarted && position.turn !== playerColor) requestBotMove();
 }
 
 function startNewGame() {
-  prepareGame(true);
+  if (gameStarted || gameOver) prepareGame();
+  startPreparedGame();
 }
 
 function changePlayerColor() {
+  if (gameStarted) return;
+  playerColor = playerColorSelect.value;
   boardFlipped = playerColorSelect.value === 'b';
-  prepareGame(false);
+  selectedSquare = null;
+  render();
 }
 
 function changeBotEngine() {
-  prepareGame(false);
+  if (gameStarted) return;
+  botErrorElement.hidden = true;
+  render();
 }
 
 boardElement.addEventListener('click', (event) => {
+  if (suppressSetupClick) return;
   const square = event.target.closest('[data-square]');
   if (square) selectSquare(Number(square.dataset.square));
+});
+
+boardElement.addEventListener('dragstart', (event) => {
+  const square = event.target.closest('[data-square]');
+  if (!square || gameStarted || setupTool || !position.board[Number(square.dataset.square)]) {
+    event.preventDefault();
+    return;
+  }
+  draggedSetupSquare = Number(square.dataset.square);
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', square.dataset.square);
+});
+boardElement.addEventListener('dragover', (event) => {
+  if (!gameStarted && draggedSetupSquare !== null) event.preventDefault();
+});
+boardElement.addEventListener('drop', (event) => {
+  if (gameStarted || draggedSetupSquare === null) return;
+  const square = event.target.closest('[data-square]');
+  if (!square) return;
+  event.preventDefault();
+  const target = Number(square.dataset.square);
+  if (target !== draggedSetupSquare) {
+    position.board[target] = position.board[draggedSetupSquare];
+    position.board[draggedSetupSquare] = null;
+    selectedSquare = null;
+    updateEditedPosition();
+    render();
+  }
+  draggedSetupSquare = null;
+  suppressSetupClick = true;
+  window.setTimeout(() => { suppressSetupClick = false; }, 0);
+});
+boardElement.addEventListener('dragend', () => {
+  draggedSetupSquare = null;
 });
 
 document.getElementById('newGameButton').addEventListener('click', startNewGame);
@@ -979,6 +1182,34 @@ undoButton.addEventListener('click', undoTurn);
 difficultySelect.addEventListener('change', render);
 playerColorSelect.addEventListener('change', changePlayerColor);
 botEngineSelect.addEventListener('change', changeBotEngine);
+piecePalette.addEventListener('click', (event) => {
+  const choice = event.target.closest('[data-piece]');
+  if (!choice || gameStarted) return;
+  setupTool = setupTool === choice.dataset.piece ? null : choice.dataset.piece;
+  selectedSquare = null;
+  setupErrorElement.hidden = true;
+  render();
+});
+erasePieceButton.addEventListener('click', () => {
+  if (gameStarted) return;
+  setupTool = setupTool === 'erase' ? null : 'erase';
+  selectedSquare = null;
+  setupErrorElement.hidden = true;
+  render();
+});
+resetPiecesButton.addEventListener('click', () => {
+  if (gameStarted) return;
+  position = createInitialPosition();
+  selectedSquare = null;
+  selectedMoves = [];
+  setupTool = null;
+  lastMove = null;
+  positionHistory = [positionKey(position)];
+  undoStack = [];
+  setupErrorElement.hidden = true;
+  setupErrorElement.textContent = '';
+  render();
+});
 document.getElementById('rotateBoardButton').addEventListener('click', () => {
   if (activeMoveAnimation) return;
   boardFlipped = !boardFlipped;

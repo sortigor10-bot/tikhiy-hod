@@ -62,6 +62,23 @@ button:focus-visible, a:focus-visible, select:focus-visible { outline: 3px solid
 
 .difficulty-label { display: block; margin: 21px 0 7px; color: var(--muted); font: 9px var(--mono); letter-spacing: .7px; }
 .difficulty-select { width: min(310px, 100%); height: 42px; padding: 0 11px; border: 1px solid var(--line); border-radius: 3px; color: var(--ink); background: var(--paper-bright); font-size: 11px; cursor: pointer; }
+.setup-panel { width: min(310px, 100%); margin-top: 20px; padding-top: 13px; border-top: 1px solid var(--line); }
+.setup-panel[hidden] { display: none; }
+.setup-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font: 9px var(--mono); letter-spacing: .55px; }
+.setup-badge { padding: 3px 5px; border-radius: 2px; color: var(--green-dark); background: var(--green-soft); font-size: 7px; }
+.setup-instruction { min-height: 28px; margin: 8px 0 7px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.piece-palette { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
+.palette-choice { min-width: 0; height: 33px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 3px; background: var(--paper-bright); font-family: 'Segoe UI Symbol', 'Noto Sans Symbols 2', 'DejaVu Sans', sans-serif; font-size: 23px; cursor: pointer; transition: background 130ms ease, border-color 130ms ease, transform 130ms ease; }
+.palette-choice:hover { transform: translateY(-1px); border-color: #aac3a9; }
+.palette-choice.white-piece { color: #fffdf5; text-shadow: 0 1px 1px #505348, 0 2px 2px #45483e; }
+.palette-choice.black-piece { color: #34372f; }
+.palette-choice.is-selected { border-color: var(--green); background: var(--green-soft); box-shadow: inset 0 0 0 1px var(--green); }
+.setup-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 7px; }
+.setup-tool-button { min-height: 31px; padding: 4px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); background: rgba(250,249,244,.8); font: 8px var(--mono); cursor: pointer; }
+.setup-tool-button:hover:not(:disabled), .setup-tool-button[aria-pressed="true"] { border-color: #aac3a9; color: var(--green-dark); background: var(--green-soft); }
+.setup-tool-button:disabled { opacity: .5; cursor: default; }
+.setup-error { margin: 8px 0 0; color: #984b3d; font-size: 10px; line-height: 1.5; }
+.setup-error[hidden] { display: none; }
 .new-game-button { width: min(310px, 100%); min-height: 49px; margin-top: 10px; padding: 0 13px; display: flex; align-items: center; justify-content: center; gap: 9px; border: 0; border-radius: 3px; color: #fff; background: var(--green); font-size: 12px; font-weight: 700; cursor: pointer; transition: background 150ms ease, transform 150ms ease; }
 .new-game-button:hover { transform: translateY(-1px); background: var(--green-dark); }
 .new-game-button span:first-child { font-size: 18px; font-weight: 400; }
@@ -91,6 +108,8 @@ button:focus-visible, a:focus-visible, select:focus-visible { outline: 3px solid
 .square.last-move.light { background: #d9e3a9; }
 .square.last-move.dark { background: #9bab68; }
 .square.selected { background: #c6d87f; }
+.chess-board.is-editing .square { cursor: pointer; }
+.chess-board.is-editing .square.selected { box-shadow: inset 0 0 0 3px var(--green); }
 .square.in-check { background: #cf8070; }
 .square:focus-visible { z-index: 2; outline: 3px solid #235d38; outline-offset: -4px; }
 .piece { position: relative; z-index: 1; display: block; font-family: 'Segoe UI Symbol', 'Noto Sans Symbols 2', 'DejaVu Sans', sans-serif; font-size: clamp(27px, 5.25vw, 49px); line-height: 1; user-select: none; transition: transform 110ms ease; }
