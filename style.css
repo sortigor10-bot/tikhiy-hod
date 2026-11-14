@@ -82,10 +82,8 @@ button:focus-visible, a:focus-visible, select:focus-visible { outline: 3px solid
 .rotate-button:disabled { opacity: .5; cursor: default; }
 
 .board-frame { position: relative; width: 100%; padding: 0 0 19px 19px; }
-.chess-board { width: 100%; aspect-ratio: 1; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); overflow: hidden; border: 1px solid #d6d4c8; background: var(--wood-light); box-shadow: 0 12px 40px rgba(48,48,36,.08); transform: rotate(0deg); transform-origin: center; transition: transform 360ms cubic-bezier(.22,.75,.22,1); }
-.chess-board.is-flipped { transform: rotate(180deg); }
-.square { position: relative; display: grid; place-items: center; min-width: 0; min-height: 0; padding: 0; border: 0; color: var(--ink); cursor: pointer; transition: background-color 180ms ease, transform 360ms cubic-bezier(.22,.75,.22,1); }
-.chess-board.is-flipped .square { transform: rotate(180deg); }
+.chess-board { width: 100%; aspect-ratio: 1; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); overflow: hidden; border: 1px solid #d6d4c8; background: var(--wood-light); box-shadow: 0 12px 40px rgba(48,48,36,.08); }
+.square { position: relative; display: grid; place-items: center; min-width: 0; min-height: 0; padding: 0; border: 0; color: var(--ink); cursor: pointer; transition: background-color 180ms ease; }
 .square.light { background: var(--wood-light); }
 .square.dark { background: var(--wood-dark); }
 .square.last-move.light { background: #d9e3a9; }

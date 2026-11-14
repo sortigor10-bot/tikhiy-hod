@@ -578,10 +578,9 @@ function renderBoard() {
     return coordinate;
   }));
   boardElement.innerHTML = '';
-  boardElement.classList.toggle('is-flipped', boardFlipped);
   boardElement.setAttribute('aria-label', `Шахматная доска, снизу ${boardFlipped ? 'чёрные' : 'белые'}`);
-  for (let rank = 7; rank >= 0; rank -= 1) {
-    for (let file = 0; file < 8; file += 1) {
+  for (const rank of displayRanks) {
+    for (const file of displayFiles) {
       const square = indexOf(file, rank);
       const piece = position.board[square];
       const button = document.createElement('button');
@@ -735,7 +734,6 @@ function prepareGame(startImmediately) {
   window.clearTimeout(botMoveTimeout);
   botMoveTimeout = null;
   playerColor = playerColorSelect.value;
-  boardFlipped = playerColor === 'b';
   position = createInitialPosition();
   selectedSquare = null;
   selectedMoves = [];
@@ -759,6 +757,7 @@ function startNewGame() {
 }
 
 function changePlayerColor() {
+  boardFlipped = playerColorSelect.value === 'b';
   prepareGame(false);
 }
 
