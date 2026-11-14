@@ -872,6 +872,7 @@ function render() {
   rotateButton.disabled = activeMoveAnimation !== null;
   playerColorSelect.disabled = gameStarted;
   botEngineSelect.disabled = gameStarted;
+  difficultySelect.disabled = gameStarted || botEngineSelect.value === 'stockfish';
 }
 
 function updateUndoButton() {
@@ -1130,6 +1131,7 @@ function changePlayerColor() {
 
 function changeBotEngine() {
   if (gameStarted) return;
+  if (botEngineSelect.value === 'stockfish') difficultySelect.value = '3';
   botErrorElement.hidden = true;
   render();
 }
