@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f3f1e8" />
-    <meta name="description" content="Сыграй в шахматы против бота. Выбирай сложность и делай первый ход." />
+    <meta name="description" content="Сыграй в шахматы против бота. Выбери соперника и сложность партии." />
     <title>Тихий ход — шахматы с ботом</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -38,11 +38,18 @@
             <div class="player-info"><strong>Бот</strong><span id="botDifficultyLabel">Спокойный соперник</span></div>
             <span class="thinking-label" id="thinkingLabel" aria-live="polite"></span>
           </div>
+          <p class="bot-error" id="botError" role="alert" hidden></p>
 
           <label class="difficulty-label" for="playerColor">ИГРАТЬ ЗА</label>
           <select class="difficulty-select" id="playerColor">
             <option value="w" selected>Белых</option>
             <option value="b">Чёрных</option>
+          </select>
+
+          <label class="difficulty-label" for="botEngine">ВЫБРАТЬ БОТА</label>
+          <select class="difficulty-select" id="botEngine">
+            <option value="kitty" selected>Котик</option>
+            <option value="stockfish">Stockfish</option>
           </select>
 
           <label class="difficulty-label" for="difficulty">СЛОЖНОСТЬ</label>

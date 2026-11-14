@@ -1,0 +1,5 @@
+This site includes Stockfish.js 19.0.1, lite single-threaded WebAssembly build.
+
+Project: https://github.com/nmrugg/stockfish.js
+Source and release: https://github.com/nmrugg/stockfish.js/releases/tag/v19.0.1
+License: GNU General Public License, version 3; see STOCKFISH-COPYING.txt.

@@ -7,8 +7,10 @@ const moveCountElement = document.getElementById('moveCount');
 const undoButton = document.getElementById('undoButton');
 const difficultySelect = document.getElementById('difficulty');
 const playerColorSelect = document.getElementById('playerColor');
+const botEngineSelect = document.getElementById('botEngine');
 const botDifficultyLabel = document.getElementById('botDifficultyLabel');
 const thinkingLabel = document.getElementById('thinkingLabel');
+const botErrorElement = document.getElementById('botError');
 const promotionDialog = document.getElementById('promotionDialog');
 const promotionOptions = document.getElementById('promotionOptions');
 const resultDialog = document.getElementById('resultDialog');
@@ -35,6 +37,11 @@ const difficultyNames = {
   2: 'Уверенный игрок',
   3: 'Серьёзный соперник',
 };
+const stockfishSettings = {
+  1: { skill: 0, moveTime: 400 },
+  2: { skill: 10, moveTime: 900 },
+  3: { skill: 20, moveTime: 1800 },
+};
 
 let position = createInitialPosition();
 let selectedSquare = null;
@@ -51,6 +58,13 @@ let gameStarted = false;
 let playedMoves = [];
 let positionHistory = [positionKey(position)];
 let undoStack = [];
+let botRequestId = 0;
+let stockfishWorker = null;
+let stockfishInitialization = null;
+let stockfishInitializationResolve = null;
+let stockfishInitializationReject = null;
+let stockfishInitializationTimeout = null;
+let stockfishSearch = null;
 
 function createInitialPosition() {
   const board = Array(64).fill(null);
@@ -398,6 +412,145 @@ function chooseBotMove() {
   return bestMoves[Math.floor(Math.random() * bestMoves.length)] || null;
 }
 
+function positionToFen(current) {
+  const ranks = [];
+  for (let rank = 7; rank >= 0; rank -= 1) {
+    let emptyCount = 0;
+    let fenRank = '';
+    for (let file = 0; file < 8; file += 1) {
+      const piece = current.board[indexOf(file, rank)];
+      if (!piece) {
+        emptyCount += 1;
+      } else {
+        if (emptyCount) fenRank += emptyCount;
+        fenRank += piece;
+        emptyCount = 0;
+      }
+    }
+    if (emptyCount) fenRank += emptyCount;
+    ranks.push(fenRank);
+  }
+  const castling = ['K', 'Q', 'k', 'q'].filter((side) => current.castling[side]).join('') || '-';
+  const enPassant = current.enPassant === null ? '-' : squareName(current.enPassant);
+  return `${ranks.join('/')} ${current.turn} ${castling} ${enPassant} ${current.halfmove} ${current.fullmove}`;
+}
+
+function stockfishFailure(worker, error) {
+  if (worker !== stockfishWorker) return;
+  const pendingSearch = stockfishSearch;
+  const rejectInitialization = stockfishInitializationReject;
+  stockfishWorker = null;
+  stockfishInitialization = null;
+  stockfishInitializationResolve = null;
+  stockfishInitializationReject = null;
+  stockfishSearch = null;
+  window.clearTimeout(stockfishInitializationTimeout);
+  stockfishInitializationTimeout = null;
+  if (pendingSearch) window.clearTimeout(pendingSearch.timeoutId);
+  worker.terminate();
+  rejectInitialization?.(error);
+  pendingSearch?.reject(error);
+}
+
+function terminateStockfish() {
+  const worker = stockfishWorker;
+  if (!worker) return;
+  const pendingSearch = stockfishSearch;
+  const rejectInitialization = stockfishInitializationReject;
+  stockfishWorker = null;
+  stockfishInitialization = null;
+  stockfishInitializationResolve = null;
+  stockfishInitializationReject = null;
+  stockfishSearch = null;
+  window.clearTimeout(stockfishInitializationTimeout);
+  stockfishInitializationTimeout = null;
+  if (pendingSearch) window.clearTimeout(pendingSearch.timeoutId);
+  worker.terminate();
+  const cancellation = new Error('Запрос Stockfish отменён.');
+  rejectInitialization?.(cancellation);
+  pendingSearch?.reject(cancellation);
+}
+
+function initializeStockfish() {
+  if (stockfishInitialization) return stockfishInitialization;
+  const worker = new Worker('./stockfish-19-lite-single.js');
+  stockfishWorker = worker;
+  stockfishInitialization = new Promise((resolve, reject) => {
+    stockfishInitializationResolve = resolve;
+    stockfishInitializationReject = reject;
+    stockfishInitializationTimeout = window.setTimeout(() => {
+      stockfishFailure(worker, new Error('Stockfish не загрузился за 20 секунд.'));
+    }, 20000);
+    worker.addEventListener('message', (event) => {
+      if (worker !== stockfishWorker) return;
+      const message = String(event.data);
+      if (message === 'uciok') {
+        worker.postMessage('isready');
+      } else if (message === 'readyok' && stockfishInitializationResolve) {
+        window.clearTimeout(stockfishInitializationTimeout);
+        stockfishInitializationTimeout = null;
+        const resolveInitialization = stockfishInitializationResolve;
+        stockfishInitializationResolve = null;
+        stockfishInitializationReject = null;
+        resolveInitialization(worker);
+      } else if (message.startsWith('bestmove ') && stockfishSearch) {
+        const pendingSearch = stockfishSearch;
+        stockfishSearch = null;
+        window.clearTimeout(pendingSearch.timeoutId);
+        pendingSearch.resolve(message.split(/\s+/)[1]);
+      }
+    });
+    worker.addEventListener('error', (event) => {
+      event.preventDefault();
+      stockfishFailure(worker, new Error(event.message || 'Не удалось загрузить Stockfish.'));
+    });
+    worker.addEventListener('messageerror', () => {
+      stockfishFailure(worker, new Error('Stockfish вернул нечитаемый ответ.'));
+    });
+    try {
+      worker.postMessage('uci');
+    } catch (error) {
+      stockfishFailure(worker, error instanceof Error ? error : new Error(String(error)));
+    }
+  });
+  return stockfishInitialization;
+}
+
+async function chooseStockfishMove(current, requestId) {
+  const worker = await initializeStockfish();
+  if (requestId !== botRequestId) return null;
+  const settings = stockfishSettings[difficultySelect.value];
+  try {
+    worker.postMessage('ucinewgame');
+    worker.postMessage(`setoption name Skill Level value ${settings.skill}`);
+    worker.postMessage(`position fen ${positionToFen(current)}`);
+    return await new Promise((resolve, reject) => {
+      const timeoutId = window.setTimeout(() => {
+        stockfishFailure(worker, new Error('Stockfish не ответил за 15 секунд.'));
+      }, 15000);
+      stockfishSearch = { resolve, reject, timeoutId };
+      worker.postMessage(`go movetime ${settings.moveTime}`);
+    });
+  } catch (error) {
+    if (worker === stockfishWorker) {
+      stockfishFailure(worker, error instanceof Error ? error : new Error(String(error)));
+    }
+    throw error;
+  }
+}
+
+function moveFromUci(current, uci) {
+  if (!/^[a-h][1-8][a-h][1-8][qrbn]?$/i.test(uci)) return null;
+  const from = indexOf(files.indexOf(uci[0]), Number(uci[1]) - 1);
+  const to = indexOf(files.indexOf(uci[2]), Number(uci[3]) - 1);
+  const promotion = uci[4]?.toLowerCase() || null;
+  return legalMoves(current).find((move) => (
+    move.from === from
+    && move.to === to
+    && (move.promotion || null) === promotion
+  )) || null;
+}
+
 function moveNotation(current, move, nextPosition) {
   if (move.castle) return move.castle === 'king' ? 'O-O' : 'O-O-O';
   const piece = current.board[move.from];
@@ -457,20 +610,39 @@ function commitMove(move) {
 
 function requestBotMove() {
   if (gameOver || position.turn === playerColor) return;
+  const requestId = ++botRequestId;
   botThinking = true;
   setStatus('БОТ ДУМАЕТ', false, true);
   thinkingLabel.textContent = 'ДУМАЕТ…';
   undoButton.disabled = true;
-  botMoveTimeout = window.setTimeout(() => {
+  botMoveTimeout = window.setTimeout(async () => {
     botMoveTimeout = null;
-    if (!botThinking || gameOver || position.turn === playerColor) return;
-    const move = chooseBotMove();
-    botThinking = false;
-    thinkingLabel.textContent = '';
-    if (move) commitMove(move);
-    if (!gameOver) {
-      const checked = isInCheck(position);
-      setStatus(checked ? 'ШАХ — ТВОЙ ХОД' : 'ТВОЙ ХОД', false);
+    if (requestId !== botRequestId || !botThinking || gameOver || position.turn === playerColor) return;
+    try {
+      const selectedMove = botEngineSelect.value === 'stockfish'
+        ? await chooseStockfishMove(position, requestId)
+        : chooseBotMove();
+      if (requestId !== botRequestId || !botThinking || gameOver || position.turn === playerColor) return;
+      const move = typeof selectedMove === 'string'
+        ? moveFromUci(position, selectedMove)
+        : selectedMove;
+      if (!move) throw new Error('Бот не вернул допустимый ход.');
+      botThinking = false;
+      thinkingLabel.textContent = '';
+      commitMove(move);
+      if (!gameOver) {
+        const checked = isInCheck(position);
+        setStatus(checked ? 'ШАХ — ТВОЙ ХОД' : 'ТВОЙ ХОД', false);
+      }
+    } catch (error) {
+      if (requestId !== botRequestId) return;
+      botThinking = false;
+      thinkingLabel.textContent = '';
+      botErrorElement.textContent = `Не удалось выполнить ход (${botEngineSelect.value === 'stockfish' ? 'Stockfish' : 'Котик'}): ${error instanceof Error ? error.message : String(error)}`;
+      botErrorElement.hidden = false;
+      setStatus('ОШИБКА БОТА');
+      render();
+      console.error('Bot move failed:', error);
     }
   }, 420);
 }
@@ -658,7 +830,8 @@ function render() {
   updateUndoButton();
   positionLabel.textContent = gameOver ? 'Партия завершена' : position.fullmove === 1 && position.turn === 'w' ? 'Начальная позиция' : `Ход ${position.fullmove}`;
   document.getElementById('playerTurnIndicator').style.visibility = gameStarted && position.turn === playerColor && !gameOver ? 'visible' : 'hidden';
-  botDifficultyLabel.textContent = difficultyNames[difficultySelect.value];
+  const botName = botEngineSelect.value === 'stockfish' ? 'Stockfish' : 'Котик';
+  botDifficultyLabel.textContent = `${botName} · ${difficultyNames[difficultySelect.value]}`;
   const playerIsWhite = playerColor === 'w';
   document.getElementById('playerColorLabel').textContent = `Играешь ${playerIsWhite ? 'белыми' : 'чёрными'}`;
   document.getElementById('playerAvatar').textContent = playerIsWhite ? symbols.P : symbols.p;
@@ -749,6 +922,8 @@ function undoTurn() {
 }
 
 function prepareGame(startImmediately) {
+  botRequestId += 1;
+  terminateStockfish();
   cancelMoveAnimation();
   window.clearTimeout(botMoveTimeout);
   botMoveTimeout = null;
@@ -768,6 +943,8 @@ function prepareGame(startImmediately) {
   promotionDialog.hidden = true;
   resultDialog.hidden = true;
   thinkingLabel.textContent = '';
+  botErrorElement.hidden = true;
+  botErrorElement.textContent = '';
   setStatus(!gameStarted ? 'ГОТОВ К ИГРЕ' : playerColor === 'w' ? 'ТВОЙ ХОД' : 'ХОД БОТА');
   render();
   if (gameStarted && position.turn !== playerColor) requestBotMove();
@@ -779,6 +956,10 @@ function startNewGame() {
 
 function changePlayerColor() {
   boardFlipped = playerColorSelect.value === 'b';
+  prepareGame(false);
+}
+
+function changeBotEngine() {
   prepareGame(false);
 }
 
@@ -797,6 +978,7 @@ resultViewBoardButton.addEventListener('click', () => {
 undoButton.addEventListener('click', undoTurn);
 difficultySelect.addEventListener('change', render);
 playerColorSelect.addEventListener('change', changePlayerColor);
+botEngineSelect.addEventListener('change', changeBotEngine);
 document.getElementById('rotateBoardButton').addEventListener('click', () => {
   if (activeMoveAnimation) return;
   boardFlipped = !boardFlipped;

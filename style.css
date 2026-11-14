@@ -57,6 +57,8 @@ button:focus-visible, a:focus-visible, select:focus-visible { outline: 3px solid
 .player-info span { color: var(--muted); font-size: 10px; }
 .turn-indicator { width: 8px; height: 8px; border-radius: 50%; background: #7db77f; box-shadow: 0 0 0 3px #e4eee0; }
 .thinking-label { color: var(--green); font: 9px var(--mono); }
+.bot-error { width: min(310px, 100%); margin: 8px 0 -10px; color: #984b3d; font-size: 10px; line-height: 1.5; }
+.bot-error[hidden] { display: none; }
 
 .difficulty-label { display: block; margin: 21px 0 7px; color: var(--muted); font: 9px var(--mono); letter-spacing: .7px; }
 .difficulty-select { width: min(310px, 100%); height: 42px; padding: 0 11px; border: 1px solid var(--line); border-radius: 3px; color: var(--ink); background: var(--paper-bright); font-size: 11px; cursor: pointer; }
