@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f3f1e8" />
+    <meta name="description" content="Сыграй в шахматы против бота. Выбирай сложность и делай первый ход." />
+    <title>Тихий ход — шахматы с ботом</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="game.js" defer></script>
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="topbar">
+        <a class="wordmark" href="#home" aria-label="Тихий ход, на главную">
+          <span class="brand-mark" aria-hidden="true">♞</span>
+          <span>тихий ход</span>
+        </a>
+        <div class="top-note"><span class="live-dot"></span> шахматы без спешки</div>
+      </header>
+
+      <section class="game-layout" id="home" aria-label="Шахматы против бота">
+        <div class="intro">
+          <p class="eyebrow"><span>ПАРТИЯ 001</span><span class="eyebrow-line"></span><span id="turnPrompt">ТВОЙ ХОД</span></p>
+          <h1>Тихий<br />ход<span class="title-period">.</span></h1>
+          <p class="intro-copy">Никакой спешки. Только ты, доска и бот, который всегда готов к новой партии.</p>
+
+          <div class="player-card">
+            <div class="player-avatar" id="playerAvatar" aria-hidden="true">♙</div>
+            <div class="player-info"><strong>Ты</strong><span id="playerColorLabel">Играешь белыми</span></div>
+            <span class="turn-indicator" id="playerTurnIndicator" aria-label="Твой ход"></span>
+          </div>
+          <div class="player-card bot-card">
+            <div class="player-avatar bot-avatar" id="botAvatar" aria-hidden="true">♟</div>
+            <div class="player-info"><strong>Бот</strong><span id="botDifficultyLabel">Спокойный соперник</span></div>
+            <span class="thinking-label" id="thinkingLabel" aria-live="polite"></span>
+          </div>
+
+          <label class="difficulty-label" for="playerColor">ИГРАТЬ ЗА</label>
+          <select class="difficulty-select" id="playerColor">
+            <option value="w" selected>Белых</option>
+            <option value="b">Чёрных</option>
+          </select>
+
+          <label class="difficulty-label" for="difficulty">СЛОЖНОСТЬ</label>
+          <select class="difficulty-select" id="difficulty">
+            <option value="1">Для разминки</option>
+            <option value="2" selected>Уверенный игрок</option>
+            <option value="3">Серьёзный соперник</option>
+          </select>
+
+          <button class="new-game-button" id="newGameButton" type="button">
+            <span aria-hidden="true">▶</span><span id="newGameButtonLabel">Начать игру</span>
+          </button>
+
+          <div class="key-hint">
+            <span class="hint-icon" aria-hidden="true">♟</span>
+            <p>Выбери фигуру, затем клетку<br /><span>Зелёные точки — возможные ходы</span></p>
+          </div>
+        </div>
+
+        <div class="game-column">
+          <div class="game-topline">
+            <div class="game-name"><span class="game-status-dot" id="statusDot"></span><span id="gameStatus" aria-live="polite">ТВОЙ ХОД</span></div>
+            <div class="board-actions">
+              <span class="game-tag" id="gameTag">БЕЛЫМИ</span>
+              <button class="rotate-button" id="rotateBoardButton" type="button" aria-label="Повернуть шахматную доску" aria-pressed="false" title="Повернуть доску на 180°">
+                <span aria-hidden="true">↻</span><span>ПОВЕРНУТЬ</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="board-frame">
+            <div class="board-coordinates board-files" id="boardFiles" aria-hidden="true">
+              <span>a</span><span>b</span><span>c</span><span>d</span><span>e</span><span>f</span><span>g</span><span>h</span>
+            </div>
+            <div class="board-coordinates board-ranks" id="boardRanks" aria-hidden="true">
+              <span>8</span><span>7</span><span>6</span><span>5</span><span>4</span><span>3</span><span>2</span><span>1</span>
+            </div>
+            <div class="chess-board" id="chessBoard" role="grid" aria-label="Шахматная доска"></div>
+          </div>
+
+          <div class="board-footer">
+            <span><span class="footer-piece" aria-hidden="true">♔</span> <span id="positionLabel">Начальная позиция</span></span>
+            <button class="undo-button" id="undoButton" type="button" disabled><span aria-hidden="true">↶</span> ОТМЕНИТЬ</button>
+          </div>
+
+          <aside class="moves-panel" aria-label="Ходы партии">
+            <div class="moves-heading"><span>ЗАПИСЬ ПАРТИИ</span><span id="moveCount">0 ходов</span></div>
+            <ol class="move-list" id="moveList" aria-live="polite">
+              <li class="empty-moves">Здесь появятся твои ходы</li>
+            </ol>
+          </aside>
+        </div>
+      </section>
+
+      <footer class="page-footer">
+        <span>СДЕЛАНО ДЛЯ ТЕХ, КТО ЛЮБИТ ПОДУМАТЬ</span>
+        <span>ТИХИЙ ХОД <span aria-hidden="true">·</span> 2026</span>
+      </footer>
+    </main>
+
+    <div class="promotion-dialog" id="promotionDialog" role="dialog" aria-modal="true" aria-labelledby="promotionTitle" hidden>
+      <div class="promotion-card">
+        <p class="eyebrow">ПОСЛЕДНИЙ РЯД</p>
+        <h2 id="promotionTitle">Выбери фигуру</h2>
+        <div class="promotion-options" id="promotionOptions"></div>
+      </div>
+    </div>
+
+    <div class="result-dialog" id="resultDialog" role="alertdialog" aria-modal="true" aria-labelledby="resultTitle" aria-describedby="resultMessage" hidden>
+      <div class="result-card" id="resultCard">
+        <span class="result-icon" id="resultIcon" aria-hidden="true">♔</span>
+        <p class="eyebrow">ПАРТИЯ ЗАВЕРШЕНА</p>
+        <h2 id="resultTitle">Ты проиграл</h2>
+        <p class="result-message" id="resultMessage"></p>
+        <button class="new-game-button result-button" id="resultNewGameButton" type="button">Сыграть ещё</button>
+      </div>
+    </div>
+  </body>
+</html>
