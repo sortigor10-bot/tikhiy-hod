@@ -1113,7 +1113,10 @@ function prepareGame() {
 }
 
 function startNewGame() {
-  if (gameStarted || gameOver) prepareGame();
+  if (gameStarted || gameOver) {
+    prepareGame();
+    return;
+  }
   startPreparedGame();
 }
 
