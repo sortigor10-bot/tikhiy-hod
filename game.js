@@ -16,6 +16,7 @@ const resultCard = document.getElementById('resultCard');
 const resultTitle = document.getElementById('resultTitle');
 const resultMessage = document.getElementById('resultMessage');
 const resultIcon = document.getElementById('resultIcon');
+const resultViewBoardButton = document.getElementById('resultViewBoardButton');
 
 const files = 'abcdefgh';
 const symbols = {
@@ -43,6 +44,7 @@ let gameOver = false;
 let botThinking = false;
 let activeMoveAnimation = null;
 let botMoveTimeout = null;
+let resultTimeout = null;
 let playerColor = 'w';
 let boardFlipped = false;
 let gameStarted = false;
@@ -434,13 +436,23 @@ function commitMove(move) {
   selectedSquare = null;
   selectedMoves = [];
   const result = terminalResult(position, positionHistory);
+  let delayedResult = null;
   if (result) {
     gameOver = true;
     setStatus(result.title.toLocaleUpperCase('ru'), true);
-    showResult(result);
+    if (result.kind === 'loss' && colorOf(movingPiece) !== playerColor) {
+      delayedResult = result;
+    } else {
+      showResult(result);
+    }
   }
   render();
-  animateMove(move, movingPiece);
+  animateMove(move, movingPiece, delayedResult ? () => {
+    resultTimeout = window.setTimeout(() => {
+      resultTimeout = null;
+      showResult(delayedResult);
+    }, 2000);
+  } : null);
 }
 
 function requestBotMove() {
@@ -463,8 +475,11 @@ function requestBotMove() {
   }, 420);
 }
 
-function animateMove(move, movingPiece) {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+function animateMove(move, movingPiece, onComplete = null) {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    onComplete?.();
+    return;
+  }
 
   const animations = [];
   const arrivingPieces = [];
@@ -511,7 +526,10 @@ function animateMove(move, movingPiece) {
     ));
   }
 
-  if (animations.length === 0) return;
+  if (animations.length === 0) {
+    onComplete?.();
+    return;
+  }
 
   const animationGroup = { animations, arrivingPieces };
   activeMoveAnimation = animationGroup;
@@ -523,6 +541,7 @@ function animateMove(move, movingPiece) {
     for (const animation of animations) animation.effect?.target?.remove();
     activeMoveAnimation = null;
     updateUndoButton();
+    onComplete?.();
   };
   Promise.all(animations.map((animation) => animation.finished)).then(
     finishAnimation,
@@ -656,7 +675,7 @@ function render() {
 
 function updateUndoButton() {
   const botOpeningNotPlayed = playerColor === 'b' && playedMoves.length === 1 && !playedMoves[0].black;
-  undoButton.disabled = !gameStarted || undoStack.length === 0 || botThinking || activeMoveAnimation !== null || botOpeningNotPlayed;
+  undoButton.disabled = !gameStarted || gameOver || undoStack.length === 0 || botThinking || activeMoveAnimation !== null || botOpeningNotPlayed;
 }
 
 function selectSquare(square) {
@@ -733,6 +752,8 @@ function prepareGame(startImmediately) {
   cancelMoveAnimation();
   window.clearTimeout(botMoveTimeout);
   botMoveTimeout = null;
+  window.clearTimeout(resultTimeout);
+  resultTimeout = null;
   playerColor = playerColorSelect.value;
   position = createInitialPosition();
   selectedSquare = null;
@@ -768,6 +789,10 @@ boardElement.addEventListener('click', (event) => {
 
 document.getElementById('newGameButton').addEventListener('click', startNewGame);
 document.getElementById('resultNewGameButton').addEventListener('click', startNewGame);
+resultViewBoardButton.addEventListener('click', () => {
+  resultDialog.hidden = true;
+  boardElement.querySelector('[data-square]')?.focus();
+});
 
 undoButton.addEventListener('click', undoTurn);
 difficultySelect.addEventListener('change', render);
